@@ -1,0 +1,51 @@
+name: Full Sync with Fork Parent Repo
+
+on:
+  # push:
+  #   branches: [ "master" ]
+  schedule:
+    - cron: '0 0 1 * *' # At 00:00 on 1st day of every month.
+    # - cron: '0 0 * * 0' # At 00:00 every Sunday.
+  workflow_dispatch: # on button click
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Fine-grained PAT with contents:write and workflows:write
+          # scopes
+          token: ${{ secrets.WORKFLOW_TOKEN }}
+      -
+        name: Set git identity
+        run: git config --global user.email "" && git config --global user.name "Full-Fork-Sync"
+      -
+        name: Add fork upstream
+        run: git remote add upstream https://github.com/pi-hole/FTL.git
+      -
+        name: Fetch origin
+        run: git fetch origin
+      -
+        name: Fetch upstream
+        run: git fetch upstream
+      -
+        name: List branches
+        run: git branch -a
+      -
+        name: Create local branches and track remotes from origin
+        run: for i in `git branch -a | grep remote | grep -v HEAD | grep -v upstream`; do git branch --track ${i#remotes/origin/} $i || true && echo $i ; done
+      -
+        name: Create local branches and track remotes from upstream
+        run: for i in `git branch -a | grep remote | grep -v HEAD | grep -v origin`; do git branch --track ${i#remotes/upstream/} $i || true && echo $i ; done
+      -
+        name: Merge local branches with upstream remotes and push to origin
+        run: for i in `git branch -a | grep remote | grep -v HEAD | grep -v origin`; do git checkout ${i#remotes/upstream/} && git merge --allow-unrelated-histories -m "Updating fork" $i && git push origin ${i#remotes/upstream/} && echo $i ; done
+      -
+        name: Fetch tags from upstream
+        run: git fetch --tags upstream
+      -
+        name: Push tags to origin
+        run: git push --tags origin
