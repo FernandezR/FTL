@@ -14,6 +14,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+
+#include "log.h"
+
 #include "dnsmasq.h"
 #ifdef HAVE_DHCP
 
@@ -559,6 +562,8 @@ void lease_prune(struct dhcp_lease *target, time_t now)
 	  if (lease->hostname)
 	    dns_dirty = 1;
 
+    log_info("DHCP lease %s expired (%s)", inet_ntoa(lease->addr), ctime(&now));
+
 	  daemon->metrics[lease->addr.s_addr ? METRIC_LEASES_PRUNED_4 : METRIC_LEASES_PRUNED_6]++;
 
  	  *up = lease->next; /* unlink */
@@ -925,6 +930,7 @@ static void kill_name(struct dhcp_lease *lease)
   
   /* this shouldn't happen unless updates are very quick and the
      script very slow, we just avoid a memory leak if it does. */
+  log_info("kill_name(): Freeing old hostname lease %s -> %s", inet_ntoa(lease->addr), lease->old_hostname);
   free(lease->old_hostname);
   
   /* If we know the fqdn, pass that. The helper will derive the
@@ -932,11 +938,15 @@ static void kill_name(struct dhcp_lease *lease)
 
   if (lease->fqdn)
     {
+  log_info("kill_name(): Freeing hostname lease %s -> %s", inet_ntoa(lease->addr), lease->hostname);
       lease->old_hostname = lease->fqdn;
       free(lease->hostname);
     }
   else
+  {
+  log_info("kill_name(): Replacing old by new hostname lease %s -> %s", inet_ntoa(lease->addr), lease->hostname);
     lease->old_hostname = lease->hostname;
+  }
 
   lease->hostname = lease->fqdn = NULL;
 }
@@ -966,6 +976,8 @@ void lease_calc_fqdns(void)
 	      strcpy(lease->fqdn, lease->hostname);
 	      strcat(lease->fqdn, ".");
 	      strcat(lease->fqdn, domain);
+
+        log_info("lease_calc_fqdns(): lease %s -> %s", inet_ntoa(lease->addr), lease->fqdn);
 	    }
 	}
     }
@@ -1059,6 +1071,8 @@ void lease_set_hostname(struct dhcp_lease *lease, const char *name, int auth, ch
   
   if (auth)
     lease->flags |= LEASE_AUTH_NAME;
+
+  log_info("lease_set_hostname(): lease %s -> %s / %s", inet_ntoa(lease->addr), lease->hostname, lease->fqdn);
   
   file_dirty = 1;
   dns_dirty = 1; 
@@ -1116,6 +1130,7 @@ int do_script_run(time_t now)
 #ifdef HAVE_SCRIPT
 	  queue_script(ACTION_OLD_HOSTNAME, lease, lease->old_hostname, now);
 #endif
+    log_info("do_script_run(): Freeing old hostname lease %s -> %s", inet_ntoa(lease->addr), lease->old_hostname);
 	  free(lease->old_hostname);
 	  lease->old_hostname = NULL;
 	  return 1;
@@ -1138,6 +1153,7 @@ int do_script_run(time_t now)
 	  emit_dbus_signal(ACTION_DEL, lease, lease->old_hostname);
 #endif
 	  old_leases = lease->next;
+    log_info("do_script_run(): Freeing lease %s -> %s", inet_ntoa(lease->addr), lease->old_hostname);
 	  
 	  free(lease->old_hostname); 
 	  free(lease->clid);
@@ -1155,6 +1171,7 @@ int do_script_run(time_t now)
 #ifdef HAVE_SCRIPT
 	queue_script(ACTION_OLD_HOSTNAME, lease, lease->old_hostname, now);
 #endif
+    log_info("do_script_run(): Freeing old hostname lease %s -> %s", inet_ntoa(lease->addr), lease->old_hostname);
 	free(lease->old_hostname);
 	lease->old_hostname = NULL;
 	return 1;
@@ -1165,6 +1182,7 @@ int do_script_run(time_t now)
 	((lease->flags & LEASE_AUX_CHANGED) && option_bool(OPT_LEASE_RO)) ||
 	((lease->flags & LEASE_EXP_CHANGED) && option_bool(OPT_LEASE_RENEW)))
       {
+    log_info("do_script_run(): Lease %s %s -> %s", (lease->flags & LEASE_NEW) ? "NEW" : "CHANGED", inet_ntoa(lease->addr), lease->old_hostname);
 #ifdef HAVE_SCRIPT
 	queue_script((lease->flags & LEASE_NEW) ? ACTION_ADD : ACTION_OLD, lease, 
 		     lease->fqdn ? lease->fqdn : lease->hostname, now);

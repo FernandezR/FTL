@@ -1356,6 +1356,9 @@ bool queries_to_database(void)
 		return false;
 	}
 
+	// Lock shared memory for reading
+	lock_shm();
+
 	// Loop over recent queries and store new or changed ones in the in-memory database
 	const unsigned int min_iter = counters->queries - 1;
 	unsigned int max_iter = min_iter > DB_QUERY_MAX_ITER ? min_iter - DB_QUERY_MAX_ITER : 0;
@@ -1598,6 +1601,9 @@ bool queries_to_database(void)
 		// Memorize query as updated in the database
 		query->flags.database.changed = false;
 	}
+
+	// Unlock shared memory
+	unlock_shm();
 
 	// Finalize all statements
 	for(unsigned int i = 0; i < ArraySize(stmts); i++)

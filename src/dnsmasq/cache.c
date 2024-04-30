@@ -17,6 +17,7 @@
 #include "dnsmasq.h"
 #include "dnsmasq_interface.h"
 #include "webserver/webserver.h"
+#include "log.h"
 
 static struct crec *cache_head = NULL, *cache_tail = NULL, **hash_table = NULL;
 #ifdef HAVE_DHCP
@@ -1577,6 +1578,8 @@ void cache_add_dhcp_entry(char *host_name, int prot,
 	  break;
 	}
     }
+
+    log_info("Adding DHCP->DNS entry for %s at %s", host_name, daemon->addrbuff);
   
   /* if in hosts, don't need DHCP record */
   if (in_hosts)
